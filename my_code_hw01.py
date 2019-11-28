@@ -33,7 +33,7 @@ class Point:
         return [self.x,self.y]
 
     def __str__(self):
-        return [self.x, self.y]
+        return "%s, %s" %(self.x, self.y)
 
 class Triangle:
     def __init__(self,a,b,c,t1,t2,t3):
@@ -41,7 +41,23 @@ class Triangle:
         self.neigh = [t1, t2, t3]
 
     def __str__(self):
-        return "[%s, %s]" % (self.points, self.neigh)
+        strg = str(id(self))+" "
+        for elem in self.points:
+            strg+= "("
+            strg+= str(elem)
+            strg+= " "
+            strg+= ")"
+        strg+= "|"
+
+        for elem in self.neigh:
+            if elem != -1:
+                strg+= str(id(elem))
+                strg+= " "
+            else:
+                strg+= str(-1)
+                strg+= " "
+
+        return strg
 
 class DT:
     def __init__(self):
@@ -52,7 +68,7 @@ class DT:
         # self.pts.append([10000, -10000])
         # self.pts.append([0, 10000])
         #- create one triangle
-        big_triangle = Triangle(Point(-10000, -10000), Point(10000, -100000), Point(0, 10000),-1,-1,-1)
+        big_triangle = Triangle(Point(-10000, -10000), Point(10000, -10000), Point(0, 10000),-1,-1,-1)
         self.trs.append(big_triangle)
 
     def number_of_points(self):
@@ -100,15 +116,25 @@ class DT:
         return switcher[i]
 
     def find_opposite_point(self, tr_init, tr_target):
-        for i in range(2):
+        for i in range(3):
             match = False
-            for j in range(2):
-                if(tr_init.neigh[j] == tr_target[i]):
+            for j in range(3):
+                if( tr_init.points[j] == tr_target.points[i]):
                     match = True
                     break
             if match:
                 continue            
-            return [tr_target[i], i] #return the point and its position
+            return [tr_target.points[i], i] #return the point and its position
+
+    def get_neighbour_of_point(self, triang, point):
+        for i in range(3):
+            if triang.points[i] == point:
+                return triang.neigh[i]
+
+    def get_index_of_point_from_neighbour(self, triang, neigh):
+        for i in range(3):
+            if triang.neigh[i] == neigh:
+                return i
 
     def check_delumany(self, triang, point):
         matrix= np.matrix([[triang.points[0].x,triang.points[0].y,triang.points[0].x**2 + triang.points[0].y**2,1],
@@ -143,15 +169,24 @@ class DT:
 
         #use the walk algorithm to go to the triangle where the point is contained:
         destination_triang = None
-        while destination_triang is None:
-            for i in range(2):
+        while destination_triang == None:
+            visited_edges = 0
+            for i in range(3):
+                #print("we entered loop with index", i)
                 if start_triang.neigh[i] != -1: #if we get to the border of the big triangle, there's no need to check
                     opposite = self.opposite_edge(i)
+                    #print("opposite?",str(opposite))
                     if(self.orientation(start_triang.points[opposite[0]],start_triang.points[opposite[1]],point)) < 0:
+                        #print("we entered here!!!")
                         start_triang = start_triang.neigh[i]
                         break
-            destination_triang = start_triang
+                visited_edges+=1
+                #print("visited edges",str(visited_edges))
+            if visited_edges==3:
+                #print("3!!!!!")
+                destination_triang = start_triang
         
+        print("found triangle: ", str(destination_triang))
         #SPLIT THE TRIANGLE INTO 3, WITH P IN THE MIDDLE (ALSO, REMOVE THE INITIAL TRIANGLE FROM THE LIST)
         self.trs.remove(destination_triang)
 
@@ -186,20 +221,66 @@ class DT:
         #TESTING
         while len(stack) != 0:
             tr = stack.pop()
-            opposite_tr = tr.neigh[2]
+            opposite_tr = tr.neigh[2] #p is always on the third position at this point
+            if(opposite_tr == -1):
+                self.trs.append(tr)
+
+                continue
+            
+            print("given triangle:", str(tr))
+            print("opposite triangle", str(opposite_tr))
             opposite_point = self.find_opposite_point(tr,opposite_tr) #has the point and its position in our triangle data structure
+            print(str(opposite_point))
             #we have two situations:
             #the newly created triangle is indeed Delaunay -> add the new triangle to the list of triangles
             #& modify the neightbour of the opposite triangle with the new one
             #it is NOT Delaunay: remove from the list of triangles the opposite triangle, create two new triangles (with the edge flipped)
             #and add them to the list of triangles
-            if(self.check_delumany(opposite_tr,opposite_point[0]) > 0):
+            if(self.check_delumany(opposite_tr,opposite_point[0]) > 0): #the point is inside the circumcircle
+                self.trs.remove(opposite_tr)
+                #we have two triangles:
+                #main_t = [a,b,p][t2,t3,neigh_c]
+                #neigh_t = we have the position of opposite of p
+                #=====>
+                print("triangle creation not delu")
+                neigh_a_opps = self.get_neighbour_of_point(opposite_tr, tr.points[0])
+                neigh_b_opps = self.get_neighbour_of_point(opposite_tr, tr.points[1])
 
-            
+                neigh_a_init = self.get_neighbour_of_point(tr, tr.points[0])
+                neigh_b_init = self.get_neighbour_of_point(tr, tr.points[1])
+
+                t1 = Triangle(point, opposite_point[0], tr.points[0], 
+                    neigh_b_opps, neigh_b_init,-1)
+                t2 = Triangle(point, opposite_point[0], tr.points[1], 
+                    neigh_a_opps, neigh_a_init ,-1)
+                
+                index_neigh_a_opps = self.get_index_of_point_from_neighbour(neigh_a_opps, opposite_tr)
+                neigh_a_opps.neigh[index_neigh_a_opps] = t2
+
+                index_neigh_b_opps = self.get_index_of_point_from_neighbour(neigh_b_opps, opposite_tr)
+                neigh_b_opps.neigh[index_neigh_b_opps] = t1
+
+                index_neigh_a_init = self.get_index_of_point_from_neighbour(neigh_a_init, tr)
+                neigh_a_init.neigh[index_neigh_a_init] = t2
+
+                index_neigh_b_init = self.get_index_of_point_from_neighbour(neigh_b_init, tr)
+                neigh_b_init.neigh[index_neigh_b_init] = t1
+
+                t1.neigh[2] = t2
+                t2.neigh[2] = t1
+
+                self.trs.append(t1)
+                self.trs.append(t2)
+            else: #our triangle is delunay, so we can just add it to the list of triangles, and modify the
+                  #neightbouring triangle to include this as its neighbour on the found position
+                  #also, add the current popped triangle to the list of triangles
+                  opposite_tr.neigh[opposite_point[1]] = tr
+                  self.trs.append(tr)        
 
 
-
-
+        for trig in self.trs:
+            print(trig)
+        print()
         # self.trs.append(t1)
         # self.trs.append(t2)
         # self.trs.append(t3)
