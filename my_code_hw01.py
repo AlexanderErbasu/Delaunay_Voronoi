@@ -130,25 +130,39 @@ class DT:
         """This function is used to check if the point in the search_trg_ind lies inside the circumcircle of initial_trg"""
         #check which is the opposite point in the neighbouring triangle:
         opposite_point_ind = self.return_opposite_point_ind(initial_trg_ind, search_trg_ind)
-        ax = self.trs[initial_trg_ind][0][0]
-        ay = self.trs[initial_trg_ind][0][1]
+        ax = self.pts[self.trs[initial_trg_ind][0]][0]
+        ay = self.pts[self.trs[initial_trg_ind][0]][1]
 
-        bx = self.trs[initial_trg_ind][1][0]
-        by = self.trs[initial_trg_ind][1][1]
+        bx = self.pts[self.trs[initial_trg_ind][1]][0]
+        by = self.pts[self.trs[initial_trg_ind][1]][1]
 
-        cx = self.trs[initial_trg_ind][2][0]
-        cy = self.trs[initial_trg_ind][2][1]
+        cx = self.pts[self.trs[initial_trg_ind][2]][0]
+        cy = self.pts[self.trs[initial_trg_ind][2]][1]
 
         px = self.pts[opposite_point_ind][0]
         py = self.pts[opposite_point_ind][1]
 
-        matrix= np.matrix([ax, ay, ax**2 + ay**2, 1],
+        matrix= np.matrix([[ax, ay, ax**2 + ay**2, 1],
                           [bx, by, bx**2 + by**2, 1],
                           [cx, cy, cx**2 + cy**2, 1],
-                          [px, py, px**2 + py**2, 1],)
+                          [px, py, px**2 + py**2, 1]])
         
+        print(m.det(matrix))
         return m.det(matrix)
+    
+    def find_neighbour_of_point(self, trg_ind, point_ind):
+        """ Searches for the position of the point (as we may not know exactly in the list where it is)
+            And it returns the index of its oposite triangle"""
+        for i in range(3):
+            if self.trs[trg_ind][i] == point_ind:
+                return self.trs[trg_ind][i+3]
 
+    def find_location_of_neighbour(self, trg_ind, neigh_ind):
+        print("trg ind", trg_ind, "neigh ind", neigh_ind)
+        for i in range(3,6):
+            if self.trs[trg_ind][i] == neigh_ind:
+                print("index here", i)
+                return i
 
     def insert_one_point(self, x, y):
         """
@@ -196,20 +210,63 @@ class DT:
             current_t_ind = stack.pop()
             print(self.trs)
             print(current_t_ind)
-            #get adjescent triangle -> the first neightbour
+            #get adjescent triangle -> the first neightbours
             adj_t_ind = self.trs[current_t_ind][3]
             if(adj_t_ind == -1):
                 continue
-            if (self.circumcirlce(current_t_ind, adj_t_ind) > 0): #it is delaunay
+            else:            
                 opposite_point_ind = self.return_opposite_point_ind(current_t_ind, adj_t_ind)
-                self.trs[adj_t_ind][opposite_point_ind+3] = current_t_ind
-            else:
-                #the edge should be flipped
-                #we create two new triangles:
-                #current_t = [point, ind_point_1, ind_point_2, adj_t, neigh_curr_point_1, neigh_curr_point_2]
-                #oppo_t = [point, ind_point_1, ind_point_2, adj_t, neigh_curr_point_1, neigh_curr_point_2]
-                #neigh_t = we have the position of opposite of p
-                #=====>
+                if (self.circumcirlce(current_t_ind, adj_t_ind) > 0): #it is delaunay
+                    self.trs[adj_t_ind][opposite_point_ind+3] = current_t_ind
+                else:
+                    #the edge should be flipped
+                    #we create two new triangles:
+                    #current_t = [point, ind_point_1, ind_point_2, adj_t, neigh_curr_point_1, neigh_curr_point_2]
+                    #oppo_t = [point, ind_point_1, ind_point_2, adj_t, neigh_curr_point_1, neigh_curr_point_2]
+                    #neigh_t = we have the position of opposite of p
+                    #=====>
+                    print("here we are")
+                    neigh_curr_a_ind = self.find_neighbour_of_point(current_t_ind,self.trs[current_t_ind][1])
+                    negih_curr_b_ind = self.find_neighbour_of_point(current_t_ind,self.trs[current_t_ind][2])
+
+                    neigh_adj_a_ind = self.find_neighbour_of_point(adj_t_ind,self.trs[current_t_ind][1])
+                    neigh_adj_b_ind = self.find_neighbour_of_point(adj_t_ind,self.trs[current_t_ind][2])
+
+                    print("here we are", neigh_curr_a_ind, negih_curr_b_ind, neigh_adj_a_ind, neigh_adj_b_ind)
+
+                    new_t1 = [point_ind, opposite_point_ind, self.trs[current_t_ind][1], 
+                                neigh_adj_b_ind, negih_curr_b_ind, -1]
+                    new_t2 = [point_ind, opposite_point_ind, self.trs[current_t_ind][2],
+                                neigh_adj_a_ind, neigh_curr_a_ind, -1]
+
+                    new_t1[5] = new_t2
+                    new_t2[5] = new_t1
+
+                    self.trs[current_t_ind] = new_t1
+                    self.trs.append(new_t2)
+                    
+                    a = self.find_location_of_neighbour(negih_curr_b_ind,current_t_ind)
+                    b = self.find_location_of_neighbour(neigh_adj_b_ind,adj_t_ind)
+                    c = self.find_location_of_neighbour(neigh_curr_a_ind,current_t_ind)
+                    d = self.find_location_of_neighbour(neigh_adj_a_ind,adj_t_ind)
+
+                    if a != -1 and a is not None:
+                        self.trs[negih_curr_b_ind][self.find_location_of_neighbour(negih_curr_b_ind,current_t_ind)] = current_t_ind
+
+                    if b != -1 and b is not None:
+                        self.trs[neigh_adj_b_ind][self.find_location_of_neighbour(neigh_adj_b_ind,adj_t_ind)] = current_t_ind
+
+                    if c != -1 and c is not None:
+                        self.trs[neigh_curr_a_ind][self.find_location_of_neighbour(neigh_curr_a_ind,current_t_ind)] = len(self.trs) -1
+
+                    if d != -1 and d is not None:
+                        self.trs[neigh_adj_a_ind][self.find_location_of_neighbour(neigh_adj_a_ind,adj_t_ind)] = len(self.trs) -1
+                    
+                    stack.append(current_t_ind)
+                    stack.append(len(self.trs) -1)
+
+                    
+
 
 
 
