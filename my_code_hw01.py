@@ -207,6 +207,7 @@ class DT:
                 #the edge should be flipped
                 #we create two new triangles:
                 #current_t = [point, ind_point_1, ind_point_2, adj_t, neigh_curr_point_1, neigh_curr_point_2]
+                #oppo_t = [point, ind_point_1, ind_point_2, adj_t, neigh_curr_point_1, neigh_curr_point_2]
                 #neigh_t = we have the position of opposite of p
                 #=====>
 
